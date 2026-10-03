@@ -152,6 +152,11 @@ button:focus-visible,input:focus-visible,summary:focus-visible,.tick:focus-withi
 #room-start{display:flex;justify-content:center}
 .note:disabled small{color:inherit}
 .sec{display:flex;flex-direction:column;gap:6px;padding-top:12px;border-top:2px dashed var(--board-line)}
+#s-room .pad{gap:9px}
+#s-room .sec{padding-top:8px;gap:4px}
+#s-room .chalk-h{font-size:34px}
+#s-room .linkbtn{min-height:36px}
+#s-room .tune summary{min-height:36px}
 .sec-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .stepper{display:flex;gap:8px}
 .pill.mini{min-width:44px;padding:0;justify-content:center;font-size:22px;font-weight:700;line-height:1}
@@ -611,6 +616,10 @@ button:focus-visible,input:focus-visible,summary:focus-visible,.tick:focus-withi
       <div class="invite" id="room-inv"><button type="button" class="pill" id="room-copy">انسخ الكود</button><button type="button" class="pill" id="room-invite">ابعت دعوة</button></div>
     </div>
     <div class="sec">
+      <div class="sec-row"><div class="sec-h">دورك</div><div class="seg"><button type="button" class="segb" id="role-st">طالب</button><button type="button" class="segb" id="role-pr">مراقب</button></div></div>
+      <div class="modehint" id="room-prhint"></div>
+    </div>
+    <div class="sec">
       <div class="sec-row"><div class="sec-h">نظام اللعب</div><div class="seg"><button type="button" class="segb" id="room-solo">فردي</button><button type="button" class="segb" id="room-teams">فرق</button></div></div>
       <div class="modehint" id="room-modehint"></div>
     </div>
@@ -779,7 +788,6 @@ button:focus-visible,input:focus-visible,summary:focus-visible,.tick:focus-withi
   <div class="pad">
     <div class="topbar"><button type="button" class="pill exit">خروج</button><span class="qn" id="rv-count"></span></div>
     <div class="qn" id="rv-me"></div>
-    <div class="qn hi" id="rv-nextpr"></div>
     <div class="paper rv-paper">
       <div class="paper-head"><span>ورقة التصحيح</span></div>
       <div class="rv-q" id="rv-q" style="padding-top:10px"></div>

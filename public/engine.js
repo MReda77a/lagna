@@ -8,7 +8,8 @@
 'use strict';
 const Q = (typeof globalThis !== 'undefined' && globalThis.LagnaQuestions) || (typeof require !== 'undefined' ? require('./questions.js') : null);
 
-const MAXP = 10, MINP = 3, MINP_TEAMS = 4;
+const MAXP = 10;
+const MIN_STUDENTS = 2, MIN_STUDENTS_TEAMS = 4;   // a human proctor is one more on top of these
 const COUNTS = [10, 20, 30];
 const REVEAL = 9;            // seconds the results of a question stay up
 /* the numbers a room's owner can tune from the lobby */
@@ -16,7 +17,7 @@ const CFG = { qTime:15, peekTime:1.6, turnTime:0.5, budget:6, writeRate:0.5, cat
 const CFG_RANGE = { qTime:[8,25], peekTime:[0.5,3], turnTime:[0.3,1], budget:[2,12], writeRate:[0.25,1.5], catchPts:[5,20], markPts:[0,10] };
 /* how long each kind of question gets, relative to qTime */
 const QMULT = { mc:1, tf:0.8, ord:1.4, num:1.2, vote:1 };
-const TEACHER = 'الأستاذ';   // the computer proctor in team games
+const TEACHER = 'الأستاذ';   // the computer proctor, when nobody takes the chair
 const BOTS = [
   {name:'منى',g:'f',skill:0.8},{name:'كريم',g:'m',skill:0.5},{name:'حمادة',g:'m',skill:0.3},
   {name:'سارة',g:'f',skill:0.55},{name:'عمر',g:'m',skill:0.65},{name:'نور',g:'f',skill:0.4},
@@ -117,18 +118,20 @@ class Host {
     this.ph = 'lobby';           // lobby | play | over
     this.set = { name:'', pub:true, teams:false, count:20, packs:Q.PACKS.map(p=>p.id) };
     this.cfg = Object.assign({}, CFG);
+    this.prPid = null;           // who chose to be the proctor; nobody = the computer proctors
     this.g = null; this.T = [0,0];
     this.ev = []; this.evSeq = 0;
     this.last = Date.now();
   }
   p(pid){ return this.P.find(p => p.id===pid) || null; }
-  minPlayers(){ return this.set.teams ? MINP_TEAMS : MINP; }
+  proctor(){ return this.prPid ? this.p(this.prPid) : null; }
+  minPlayers(){ return (this.set.teams ? MIN_STUDENTS_TEAMS : MIN_STUDENTS) + (this.proctor() ? 1 : 0); }
   pool(){ const l=Q.QUESTIONS.filter(q => this.set.packs.includes(q.p)); return l.length>=4 ? l : Q.QUESTIONS; }
 
   add(pid, name, g, bot, skill){
     if(this.p(pid) || this.P.length>=MAXP) return null;
     const p = { id:pid, name, g: g==='f'?'f':'m', bot:!!bot, skill:skill||0, conn:true, out:false, pts:0, team:0 };
-    if(this.ph!=='lobby'){ const n0=this.P.filter(x=>x.team===0).length, n1=this.P.length-n0; p.team = n0<=n1 ? 0 : 1; }
+    if(this.ph!=='lobby'){ const n0=this.P.filter(x=>x.team===0).length, n1=this.P.filter(x=>x.team===1).length; p.team = n0<=n1 ? 0 : 1; }
     this.P.push(p);
     return p;
   }
@@ -140,7 +143,7 @@ class Host {
     for(let i=this.P.length-1;i>=0;i--) if(this.P[i].bot){ this.P.splice(i,1); return true; }
     return false;
   }
-  remove(pid){ this.P = this.P.filter(p => p.id!==pid); }
+  remove(pid){ this.P = this.P.filter(p => p.id!==pid); if(this.prPid===pid) this.prPid=null; }
   /** A player's phone connected or dropped. In a game they keep their seat and can come back. */
   setConn(pid, on){
     const p=this.p(pid); if(!p || p.bot || p.conn===on) return;
@@ -169,22 +172,14 @@ class Host {
   }
   start(){
     if(this.ph!=='lobby' || this.P.length<this.minPlayers()) return false;
-    this.P.forEach((p,i) => { p.pts=0; p.out=false; p.team=i%2; });
+    /* the proctor is whoever chose the chair in the lobby, for the whole game; everyone else is a student */
+    const pr=this.proctor(); let k=0;
+    this.P.forEach(p => { p.pts=0; p.out=false; p.team = p===pr ? -1 : (k++)%2; });
     this.T=[0,0];
-    this.g = { teams:!!this.set.teams, qs:shuffle(this.pool()).slice(0,this.set.count), qi:0, turn:Math.floor(Math.random()*this.P.length) };
+    this.g = { teams:!!this.set.teams, qs:shuffle(this.pool()).slice(0,this.set.count), qi:0, prId: pr ? pr.id : null };
     this.ph='play'; this.last=Date.now();
     this.startQuestion();
     return true;
-  }
-  /** In an individual game the proctor's chair goes round: everyone gets the same share of questions. */
-  proctorFor(qi){
-    const g=this.g, n=this.P.length;
-    const k = g.qs.length>=n ? Math.floor(qi*n/g.qs.length) : qi;
-    for(let j=0;j<n;j++){
-      const p=this.P[(g.turn+k+j)%n];
-      if(p.bot || (p.conn && !p.out)) return p;   // someone who walked out does not get the chair
-    }
-    return this.P[(g.turn+k)%n];
   }
   isAway(pl){ return !pl.bot && (!pl.conn || pl.out); }
 
@@ -199,8 +194,8 @@ class Host {
     g.disp = q.t==='ord' ? shuffle([0,1,2,3]) : [0,1,2,3];
     if(q.t==='ord' && g.disp.join('')==='0123') g.disp=[2,0,3,1];
 
-    /* who sits where: in teams the computer proctors and everyone plays; otherwise one player takes the chair */
-    const prPl = g.teams ? null : this.proctorFor(g.qi);
+    /* who sits where: the proctor's chair is taken by a player, or by the computer */
+    const prPl = g.prId ? this.p(g.prId) : null;
     const seated = this.P.filter(p => p!==prPl);
     if(g.teams) seated.sort((a,b) => a.team-b.team);
     g.rc = g.teams ? seated.filter(p=>p.team===0).length : Math.ceil(seated.length/2);
@@ -247,6 +242,13 @@ class Host {
     if(!d || typeof d!=='object') return;
     const pl=this.p(pid); if(!pl) return;
     this.tick(Date.now());
+    if(d.k==='role'){
+      /* in the lobby anyone can take the proctor's chair if it is free, or give it back */
+      if(this.ph!=='lobby') return;
+      if(d.v==='pr'){ if(!this.proctor()) this.prPid=pid; }
+      else if(this.prPid===pid) this.prPid=null;
+      return;
+    }
     if(d.k==='out'){
       if(this.ph==='play' && pl.out!==!!d.v){ pl.out=!!d.v; this.event(pl.out?'left':'back', pl); }
       return;
@@ -538,7 +540,7 @@ class Host {
 
   /* ---------- what one player is allowed to see ---------- */
   view(pid){
-    const V = { code:this.code, ph:this.ph, owner:this.me, me:pid, set:this.set, cfg:this.cfg,
+    const V = { code:this.code, ph:this.ph, owner:this.me, me:pid, set:this.set, cfg:this.cfg, pr:this.proctor() ? this.prPid : null,
       min:this.minPlayers(), max:MAXP, qn:Math.min(this.set.count, this.pool().length),
       P:this.P.map(p => ({ id:p.id, n:p.name, g:p.g, bot:p.bot?1:0, on:p.conn?1:0, out:p.out?1:0, pts:p.pts, team:p.team })),
       T:this.T, ev:this.ev };
@@ -585,13 +587,12 @@ class Host {
       o.tres=g.tres; o.pr.delta=pr.delta;
       o.revealLeft=Math.max(0, Math.ceil(g.revealLeft||0));
       o.last = g.qi+1>=g.qs.length ? 1 : 0;
-      if(!o.last && !g.teams){ const np=this.proctorFor(g.qi+1); o.nextPr = np ? np.id : null; }
     }
     return o;
   }
 }
 
-const LagnaEngine = { Host, MAXP, MINP, MINP_TEAMS, COUNTS, CFG, CFG_RANGE, TEACHER, rid, isPick, keyOf, correctAns, posRight, tally, members, cheaterOf };
+const LagnaEngine = { Host, MAXP, COUNTS, CFG, CFG_RANGE, TEACHER, rid, isPick, keyOf, correctAns, posRight, tally, members, cheaterOf };
 if(typeof globalThis !== 'undefined') globalThis.LagnaEngine = LagnaEngine;
 if(typeof module !== 'undefined' && module.exports) module.exports = LagnaEngine;
 })();

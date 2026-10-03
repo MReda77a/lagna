@@ -66,7 +66,7 @@ const SAY = {
 };
 const HOW = {
   solo:[
-    'كل واحد من موبايله. في كل سؤال واحد منكم بيبقى المراقب والباقي طلبة، والدور بيلفّ عليكم.',
+    'كل واحد من موبايله. قبل ما تبدأوا، اللي عايز يبقى المراقب يختار "مراقب" والباقي طلبة. لو محدش اختار، الكمبيوتر هو المراقب.',
     'الطالب يجاوب في ورقته قبل ما الوقت يخلص. كل سؤال ليه طريقة: اختيار، صح ولا غلط، ترتيب، أو رقم.',
     'مش عارف؟ دوس على "بص" وافضل دايس. ورقة جارك بتبدأ مش واضحة وبتوضح وإنت دايس، ولو سبت ورجعت بتكمّل من مكان ما وقفت.',
     'السبورة اللي فوق خضرا يعني أمان. لو احمرّت سيب الزرار فوراً. لو المراقب لفّ وإنت دايس، سؤالك يتلغى وتنقص ٥.',
@@ -74,7 +74,7 @@ const HOW = {
     'المراقب يقدر يكتب أسامي على السبورة: في المشاغبين لو شاكك، وفي الممتازين لو متأكد. حكمه صح يكسب، غلط يخسر.'
   ],
   teams:[
-    'اللجنة صفّين: صف اليمين وصف الشمال، والمراقب هو الكمبيوتر.',
+    'اللجنة صفّين: صف اليمين وصف الشمال. المراقب واحد منكم لو اختار "مراقب"، وإلا يبقى الكمبيوتر.',
     'كل صف ليه إجابة واحدة. كل واحد يحط الإجابة اللي شاكك فيها، وبتشوفوا الصف رايح على إيه.',
     'لو الصف كله على نفس الإجابة تبقى إجابتكم. لو ما اتفقتوش، الأغلبية آخر الوقت هي اللي تتحسب.',
     'في كل سؤال واحد بس من الصف هو الغشاش، والدور بيلفّ: يدوس ويفضل دايس عشان يشوف الصف التاني كاتبين إيه.',
@@ -350,7 +350,7 @@ function onState(v){
 }
 const meP = () => V.P.find(p => p.id===pid) || null;
 const isOwner = () => V.owner===pid;
-const myTeam = () => { const p=meP(); return (V.g && V.g.teams && p) ? p.team : -1; };
+const myTeam = () => { const p=meP(); return (V.g && V.g.teams && p && p.team>=0) ? p.team : -1; };
 function buildG(){
   const v=V.g, mi=v.mi, isPr=v.role==='proctor';
   const S=v.S.map((s,i) => {
@@ -360,7 +360,7 @@ function buildG(){
       base:s.base||0, near:!!s.near, exact:!!s.exact, bonus:s.bonus||0, delta:s.delta||0, didCopy:!!s.didCopy, copiedFrom:s.copiedFrom, peeked:!!s.peeked, markRes:s.markRes||null };
   });
   G = { mode:v.role, teams:!!v.teams, phase:v.phase, qi:v.qi, qs:{length:v.qn}, qT:v.qT, left:v.left, rc:v.rc, me:mi, q:v.q, disp:v.disp, void:v.void,
-    watched:!!v.watched, students:S, hamR:v.hamR||0, hamL:v.hamL||0, tres:v.tres||null, revealLeft:v.revealLeft||0, last:!!v.last, nextPr:v.nextPr||null,
+    watched:!!v.watched, students:S, hamR:v.hamR||0, hamL:v.hamL||0, tres:v.tres||null, revealLeft:v.revealLeft||0, last:!!v.last,
     pr:{ name:isPr?'إنت':v.pr.n, real:v.pr.n, g:isPr?'u':(v.pr.g==='f'?'f':'m'), id:v.pr.id, isUser:isPr, bot:!!v.pr.bot, away:!!v.pr.away, st:v.pr.st,
          budget: v.pr.budget!==undefined ? v.pr.budget : (v.pr.noBud?0:1), writePts:v.pr.writePts||0, fx:!!v.pr.fx, lookAt:v.pr.lookAt||{},
          catches:v.pr.catches||[], lookCatches:v.pr.lookCatches||[], delta:v.pr.delta||0 } };
@@ -412,13 +412,13 @@ function renderRoom(){
   $('room-name').textContent=s.name;
   $('room-code').textContent = LOCAL ? 'من غير نت' : 'كود '+ar(V.code);
   $('room-count').textContent='الحاضرين '+ar(n)+' من '+ar(V.max);
-  const key=JSON.stringify([V.P.map(p => [p.id,p.n,p.on,p.bot,p.out]), V.owner]);
+  const key=JSON.stringify([V.P.map(p => [p.id,p.n,p.on,p.bot,p.out]), V.owner, V.pr]);
   if(U.roomKey!==key){
     U.roomKey=key;
     const ros=$('room-roster'); ros.textContent='';
     V.P.forEach(p => {
       const el=document.createElement('span');
-      el.textContent=p.n+(p.id===pid?' (إنت)':'');
+      el.textContent=p.n+(p.id===pid?' (إنت)':'')+(p.id===V.pr?'، المراقب':'');
       el.className=(p.id===pid?'me ':'')+(p.bot?'bot ':'')+(p.id===V.owner?'host ':'')+((!p.on||p.out)?'off':'');
       ros.appendChild(el);
     });
@@ -432,7 +432,13 @@ function renderRoom(){
   $('room-solo').classList.toggle('on', !s.teams); $('room-solo').setAttribute('aria-pressed', s.teams?'false':'true');
   $('room-teams').classList.toggle('on', s.teams); $('room-teams').setAttribute('aria-pressed', s.teams?'true':'false');
   $('room-solo').disabled=$('room-teams').disabled=!owner || !lobby;
-  $('room-modehint').textContent = s.teams ? 'صفّين ضد بعض: كل صف ليه إجابة واحدة وغشاش واحد، والمراقب هو الكمبيوتر.' : 'كل واحد بيجاوب لنفسه ويبص على اللي جنبه، ودور المراقب بيلفّ عليكم.';
+  $('room-modehint').textContent = s.teams ? 'صفّين ضد بعض: كل صف ليه إجابة واحدة، وفي كل سؤال غشاش واحد.' : 'كل واحد بيجاوب لنفسه ويبص على اللي جنبه.';
+  /* my role: a student, or the proctor if the chair is free */
+  const prP=V.P.find(p => p.id===V.pr) || null, iAmPr=V.pr===pid;
+  $('role-st').classList.toggle('on', !iAmPr); $('role-st').setAttribute('aria-pressed', iAmPr?'false':'true');
+  $('role-pr').classList.toggle('on', iAmPr); $('role-pr').setAttribute('aria-pressed', iAmPr?'true':'false');
+  $('role-st').disabled=!lobby; $('role-pr').disabled=!lobby || !!(prP && !iAmPr);
+  $('room-prhint').textContent = iAmPr ? 'إنت المراقب طول اللعبة، والباقي طلبة.' : prP ? 'المراقب: '+prP.n+'. إنت طالب.' : 'المراقب دلوقتي الكمبيوتر. عايز تراقب إنت؟ اختار "مراقب".';
   $('room-packs').textContent=(s.packs.length===ALL_PACKS.length?'كل المواد':s.packs.map(id => PACK_NAME[id]).join('، '))+'، '+ar(V.qn)+(V.qn<=10?' أسئلة':' سؤال');
 
   const live=!lobby;
@@ -460,6 +466,8 @@ $('room-more').addEventListener('click', () => cmd('addbot'));
 $('room-solo').addEventListener('click', () => cmd('teams', {v:false}));
 $('room-teams').addEventListener('click', () => cmd('teams', {v:true}));
 $('btn-start').addEventListener('click', () => cmd('start'));
+$('role-st').addEventListener('click', () => act({k:'role', v:'st'}));
+$('role-pr').addEventListener('click', () => act({k:'role', v:'pr'}));
 $('room-leave').addEventListener('click', () => { send({t:'leave'}); goHome(''); });
 $('live-back').addEventListener('click', () => act({k:'out', v:false}));
 $('live-end').addEventListener('click', () => cmd('end'));
@@ -744,8 +752,11 @@ function renderProctor(){
 /* ============ results ============ */
 function standings(){
   let rows;
-  if(V.g && V.g.teams) rows=[0,1].map(t => ({ name:(myTeam()===t?'صفّكم، ':'')+TEAM[t], total:V.T[t], me:myTeam()===t, role:V.P.filter(p => p.team===t).map(p => p.id===pid?'إنت':p.n).join('، ') }));
-  else rows=V.P.map(p => ({ name:p.n+(p.id===pid?' (إنت)':''), total:p.pts, me:p.id===pid, role:p.bot?'كمبيوتر':'' }));
+  if(V.g && V.g.teams){
+    rows=[0,1].map(t => ({ name:(myTeam()===t?'صفّكم، ':'')+TEAM[t], total:V.T[t], me:myTeam()===t, role:V.P.filter(p => p.team===t).map(p => p.id===pid?'إنت':p.n).join('، ') }));
+    V.P.filter(p => p.team<0).forEach(p => rows.push({ name:p.n+(p.id===pid?' (إنت)':''), total:p.pts, me:p.id===pid, role:'المراقب' }));
+  }
+  else rows=V.P.map(p => ({ name:p.n+(p.id===pid?' (إنت)':''), total:p.pts, me:p.id===pid, role:p.team<0?'المراقب':(p.bot?'كمبيوتر':'طالب') }));
   rows.sort((a,b) => b.total-a.total);
   return rows;
 }
@@ -810,9 +821,7 @@ function renderReveal(){
   /* a running score */
   const st=standings(); let rank=1, mine=0;
   st.forEach((r,i) => { if(r.me){ rank=i+1; mine=r.total; } });
-  $('rv-me').textContent=(G.teams?'مجموع صفّكم ':'مجموعك ')+num(mine)+'، والترتيب '+ar(rank)+' من '+ar(st.length);
-  const np = G.nextPr ? V.P.find(x => x.id===G.nextPr) : null;
-  $('rv-nextpr').textContent = (!np || G.nextPr===p.id) ? '' : (np.id===pid ? 'إنت المراقب في السؤال الجاي!' : 'المراقب في السؤال الجاي: '+np.n);
+  $('rv-me').textContent=(myTeam()>=0?'مجموع صفّكم ':'مجموعك ')+num(mine)+'، والترتيب '+ar(rank)+' من '+ar(st.length);
 }
 function syncReveal(){
   const owner=isOwner();
@@ -824,7 +833,7 @@ function renderEnd(){
   const rows=standings(); let meRank=1;
   rows.forEach((r,i) => { if(r.me) meRank=i+1; });
   let title = meRank===1 ? 'إنت الأول!' : 'ترتيبك '+ar(meRank)+' من '+ar(rows.length);
-  if(V.g && V.g.teams){ const a=V.T[myTeam()], b=V.T[1-myTeam()]; title = a>b ? 'صفّكم كسب!' : a===b ? 'تعادل بين الصفّين' : 'صفّكم خسر'; }
+  if(myTeam()>=0){ const a=V.T[myTeam()], b=V.T[1-myTeam()]; title = a>b ? 'صفّكم كسب!' : a===b ? 'تعادل بين الصفّين' : 'صفّكم خسر'; }
   $('end-title').textContent=title;
   const box=$('end-rows'); box.textContent='';
   box.classList.toggle('dense', rows.length>6);
