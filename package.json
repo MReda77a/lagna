@@ -1,0 +1,21 @@
+{
+  "name": "lagna",
+  "version": "1.0.0",
+  "description": "Lagna — party quiz for phones: cheating is allowed, but there is a proctor.",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "cf:dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.40.0"
+  }
+}
