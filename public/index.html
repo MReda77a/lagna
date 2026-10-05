@@ -172,6 +172,27 @@ button:focus-visible,input:focus-visible,summary:focus-visible,.tick:focus-withi
 .segb{min-height:40px;padding:0 18px;border:0;background:transparent;color:var(--chalk);font-weight:700;font-size:14px}
 .segb.on{background:var(--sun);color:var(--ink)}
 .modehint{font-size:13px;color:var(--chalk-soft)}
+.rows2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;align-items:start}
+.rowbox{display:flex;flex-direction:column;gap:6px;padding:8px;border:2px solid var(--board-line);border-radius:12px}
+.rowbox.myrow{border-color:var(--chalk)}
+.rowbox-h{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--display);font-weight:800;font-size:17px;line-height:1.3;color:var(--sun)}
+.rowbox-h small{font-family:var(--body);font-weight:700;font-size:13px;color:var(--chalk-soft)}
+.rowlist{display:flex;flex-direction:column;gap:5px}
+.rowempty{min-height:40px;display:grid;place-items:center;font-size:13px;color:var(--chalk-soft)}
+.mem{display:flex;gap:4px}
+.mem.off{opacity:.4}
+.memb{flex:1;min-width:0;min-height:40px;padding:0 10px;border:2px solid var(--chalk-soft);border-radius:999px;background:transparent;color:var(--chalk);font-family:var(--display);font-weight:700;font-size:16px;line-height:1.3;display:flex;align-items:center;justify-content:space-between;gap:6px;text-align:start}
+.memb span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.memb i{display:none;flex:none;line-height:0}
+.mem.me .memb{border-color:var(--chalk)}
+.mem.bot .memb{border-style:dashed}
+.mem.ch .memb{border-color:var(--sun);border-style:solid;background:var(--sun);color:var(--ink)}
+.mem.ch .memb i{display:block}
+.memb:disabled{cursor:default}
+.mv{flex:none;min-width:44px;min-height:40px;padding:0 8px;border:2px solid var(--chalk-soft);border-radius:999px;background:transparent;color:var(--chalk-soft);font-weight:700;font-size:12px}
+.mv:disabled{opacity:.35;cursor:default}
+.rowch{font-size:12px;color:var(--chalk-soft)}
+.pill.sit{min-height:40px;padding:0 8px;justify-content:center;font-size:13px}
 .sec-h{font-family:var(--display);font-weight:800;font-size:19px;line-height:1.3;color:var(--sun)}
 .tune summary{cursor:pointer;min-height:44px;display:flex;align-items:center;justify-content:center;font-weight:500;font-size:14px;color:var(--chalk-soft);text-decoration:underline;list-style:none}
 .tune summary::-webkit-details-marker{display:none}
@@ -219,6 +240,15 @@ button:focus-visible,input:focus-visible,summary:focus-visible,.tick:focus-withi
 .teamline{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:36px;font-size:14px;font-weight:700;color:var(--pen)}
 .adopt{flex:none;min-height:36px;padding:0 12px;border:2px solid var(--pen);border-radius:999px;background:transparent;color:var(--pen);font-weight:700;font-size:13px}
 .kind{font-size:13px;font-weight:500;color:var(--ink-soft)}
+.bets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.bet{min-height:46px;padding:2px 4px;border:2.5px dashed var(--ink);border-radius:12px;background:var(--paper);color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.25}
+.bet b{font-family:var(--display);font-weight:800;font-size:16px}
+.bet small{font-size:11px;font-weight:500;color:var(--ink-soft);white-space:nowrap}
+.bet.on{border-style:solid;background:var(--hi)}
+.bet.on[data-b="2"],.bet.on[data-b="3"]{background:var(--sun)}
+.bet.on small{color:var(--ink)}
+.bet:disabled{border-color:var(--faint);color:#8FA39B;background:var(--paper);cursor:default}
+.bet:disabled small{color:#8FA39B}
 .q.small{font-size:20px;line-height:1.45}
 .theirs .tq.small{font-size:15px}
 .opts.two .opt{min-height:76px}
@@ -425,8 +455,17 @@ button:focus-visible,input:focus-visible,summary:focus-visible,.tick:focus-withi
   .long .cell{min-height:38px;padding:3px 8px}
   .long .cell .lbl{font-size:12px;line-height:1.25}
   .long .cell .bub{width:24px;height:24px;font-size:12px}
-  .numshow{min-height:46px;font-size:32px}
-  .key{min-height:40px;font-size:19px}
+  .numshow{min-height:34px;font-size:26px}
+  .key{min-height:36px;font-size:19px}
+  .peekbtns .note{min-height:80px}
+  .bet{min-height:36px}
+  .bet b{font-size:15px}
+  .mypaper{gap:7px;padding:10px 14px 12px}
+  .teamline{min-height:26px;font-size:13px}
+  .adopt{min-height:30px}
+  .teaminfo{padding:5px 12px}
+  .teaminfo b{font-size:17px}
+  .keys{margin-top:6px}
   .opts.two .opt{min-height:60px}
   .kind{font-size:12px}
   .bigans{min-height:48px;font-size:26px}
@@ -480,7 +519,7 @@ button:focus-visible,input:focus-visible,summary:focus-visible,.tick:focus-withi
 
 </head>
 <body>
-<main id="app" dir="rtl" lang="ar">
+<main id="app" dir="rtl" lang="ar" data-build="6">
 <div class="toast" id="toast" role="status" hidden></div>
 
 <!-- ============ home ============ -->
@@ -612,6 +651,11 @@ button:focus-visible,input:focus-visible,summary:focus-visible,.tick:focus-withi
     <div class="sec">
       <div class="sec-row"><div class="sec-h" id="room-count"></div><div class="stepper" id="room-stepper"><button type="button" class="pill mini" id="room-less" aria-label="شيل لاعب كمبيوتر">−</button><button type="button" class="pill addbot" id="room-more" aria-label="ضيف لاعب كمبيوتر">+ كمبيوتر</button></div></div>
       <div class="roster" id="room-roster"></div>
+      <div class="rows2" id="room-rows" hidden>
+        <div class="rowbox" id="row-b0"><div class="rowbox-h"><b>صف اليمين</b><small id="row-n0"></small></div><div class="rowlist" id="row-l0"></div><div class="rowch" id="row-c0"></div><button type="button" class="pill sit" id="row-sit0" data-r="0">اقعد في الصف ده</button></div>
+        <div class="rowbox" id="row-b1"><div class="rowbox-h"><b>صف الشمال</b><small id="row-n1"></small></div><div class="rowlist" id="row-l1"></div><div class="rowch" id="row-c1"></div><button type="button" class="pill sit" id="row-sit1" data-r="1">اقعد في الصف ده</button></div>
+      </div>
+      <div class="modehint" id="rows-hint" hidden></div>
       <div class="modehint" id="room-empty" hidden>لسه محدش دخل. ابعت دعوة لصحابك، أو ضيف لعيبة كمبيوتر تجرّب معاهم.</div>
       <div class="invite" id="room-inv"><button type="button" class="pill" id="room-copy">انسخ الكود</button><button type="button" class="pill" id="room-invite">ابعت دعوة</button></div>
     </div>
@@ -693,6 +737,11 @@ button:focus-visible,input:focus-visible,summary:focus-visible,.tick:focus-withi
             <button type="button" class="key" data-d="1">١</button><button type="button" class="key" data-d="2">٢</button><button type="button" class="key" data-d="3">٣</button><button type="button" class="key" data-d="4">٤</button><button type="button" class="key" data-d="5">٥</button><button type="button" class="key" data-d="6">٦</button>
             <button type="button" class="key" data-d="7">٧</button><button type="button" class="key" data-d="8">٨</button><button type="button" class="key" data-d="9">٩</button><button type="button" class="key" data-d="0">٠</button><button type="button" class="key del" data-d="del">امسح</button>
           </div>
+        </div>
+        <div class="bets" id="st-bets">
+          <button type="button" class="bet" data-b="1"><b>عادي</b><small>صح +١٠</small></button>
+          <button type="button" class="bet" data-b="2"><b>دوبل</b><small>+٢٠ أو −١٠</small></button>
+          <button type="button" class="bet" data-b="3"><b id="st-bet3">تربل</b><small>+٣٠ أو −٣٠</small></button>
         </div>
       </div>
       <div class="caughtstamp" id="st-caught" hidden><b id="st-caught-b">اتمسكت!</b><span id="st-caught-s">سؤالك اتلغى واتخصم منك ٥ نقط</span></div>
@@ -818,8 +867,9 @@ button:focus-visible,input:focus-visible,summary:focus-visible,.tick:focus-withi
 
 </main>
 
-<script src="questions.js"></script>
-<script src="engine.js"></script>
-<script src="app.js"></script>
+<!-- when the files change, raise the number here, in data-build above and in BUILD at the top of app.js -->
+<script src="questions.js?v=6"></script>
+<script src="engine.js?v=6"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>

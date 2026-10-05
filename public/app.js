@@ -6,6 +6,20 @@
    ========================================================== */
 (function(){
 'use strict';
+/* The page and this file must come from the same build. If the browser kept an old copy of one of them,
+   or only some of the files were uploaded, say so instead of failing silently. */
+const BUILD = '6';
+(function(){
+  const app=document.getElementById('app');
+  if(app && app.getAttribute('data-build')===BUILD) return;
+  const box=document.createElement('div');
+  box.setAttribute('dir','rtl');
+  box.style.cssText='position:fixed;inset:0;z-index:99;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:28px;background:#0F4636;color:#FFFDF5;font-family:Tahoma,Arial,sans-serif;font-size:17px;line-height:1.7;text-align:center';
+  box.innerHTML='<b style="font-size:24px">في تحديث جديد للعبة</b><span>الصفحة اللي عندك من نسخة قديمة. حدّث الصفحة عشان تكمّل.</span><button type="button" style="min-height:52px;padding:0 28px;border:0;border-radius:999px;background:#FFC93C;color:#0B2E24;font:inherit;font-weight:700">حدّث الصفحة</button><small style="opacity:.75">لو الرسالة فضلت تطلع: ملفات index.html و app.js على السيرفر مش من نفس النسخة.</small>';
+  box.querySelector('button').addEventListener('click', () => location.reload());
+  document.body.appendChild(box);
+  throw new Error('Lagna: index.html and app.js are from different builds');
+})();
 const E = globalThis.LagnaEngine, QB = globalThis.LagnaQuestions;
 const PACKS = QB.PACKS, ALL_PACKS = PACKS.map(p => p.id), PACK_NAME = {};
 PACKS.forEach(p => { PACK_NAME[p.id] = p.name; });
