@@ -10,6 +10,10 @@ const Q = (typeof globalThis !== 'undefined' && globalThis.LagnaQuestions) || (t
 
 const MAXP = 10;
 const MIN_STUDENTS = 2, MIN_STUDENTS_TEAMS = 4;   // a human proctor is one more on top of these
+const ROW_MIN = 2, ROW_MAX = 6;                   // how many can sit in one row in a team game
+/* the wager: 1 = normal, 2 = double, 3 = triple. A lost wager costs LOSE points; triples are limited per game. */
+const LOSE = { 1:0, 2:10, 3:30 };
+const TRIPLES = { 10:2, 20:3, 30:4 };
 const COUNTS = [10, 20, 30];
 const REVEAL = 9;            // seconds the results of a question stay up
 /* the numbers a room's owner can tune from the lobby */
@@ -98,7 +102,14 @@ function scoreVotes(q, list, voters){
   q.win = top>=2 ? c.map((n,i)=>n===top?i:-1).filter(i=>i>=0) : [];
   list.forEach(e => { e.base = (e.ans!==null && q.win.includes(e.ans)) ? 10 : 0; });
 }
+/** What an answer is worth once the wager on it is counted. */
+function stakePts(base, bet){ return bet>1 ? (base>=10 ? base*bet : -LOSE[bet]) : base; }
 const members = (g,t) => g.students.filter(s => s.team===t);
+/** A team's wager is the lowest one among the members who answered: everyone has to raise for it to count. */
+function teamBet(g, t){
+  const m=members(g,t).filter(s => !s.away && keyOf(g.q,s.ans)!==null);
+  return m.length ? Math.min.apply(null, m.map(s => s.bet||1)) : 1;
+}
 const cheaterOf = (g,t) => g.students.find(s => s.team===t && s.cheater) || null;
 /** A team's sheet: how many members are on each answer, and which answer is ahead (none on a tie). */
 function tally(g, t){
@@ -119,19 +130,30 @@ class Host {
     this.set = { name:'', pub:true, teams:false, count:20, packs:Q.PACKS.map(p=>p.id) };
     this.cfg = Object.assign({}, CFG);
     this.prPid = null;           // who chose to be the proctor; nobody = the computer proctors
-    this.g = null; this.T = [0,0];
+    this.ch = [null,null];       // each row's chosen cheater in a team game; nobody = it goes round
+    this.g = null; this.T = [0,0]; this.TA = [0,0];
     this.ev = []; this.evSeq = 0;
     this.last = Date.now();
   }
   p(pid){ return this.P.find(p => p.id===pid) || null; }
   proctor(){ return this.prPid ? this.p(this.prPid) : null; }
   minPlayers(){ return (this.set.teams ? MIN_STUDENTS_TEAMS : MIN_STUDENTS) + (this.proctor() ? 1 : 0); }
+  /** How many students sit in each row (the proctor is not in a row). */
+  rows(){ return [0,1].map(r => this.P.filter(p => p.row===r && p.id!==this.prPid).length); }
+  canStart(){
+    if(this.P.length<this.minPlayers()) return false;
+    return !this.set.teams || Math.min.apply(null, this.rows())>=ROW_MIN;
+  }
+  /** Forget a chosen cheater who left, changed rows or took the proctor's chair. */
+  fixCheaters(){
+    [0,1].forEach(r => { const p=this.ch[r] && this.p(this.ch[r]); if(!p || p.row!==r || p.id===this.prPid) this.ch[r]=null; });
+  }
   pool(){ const l=Q.QUESTIONS.filter(q => this.set.packs.includes(q.p)); return l.length>=4 ? l : Q.QUESTIONS; }
 
   add(pid, name, g, bot, skill){
     if(this.p(pid) || this.P.length>=MAXP) return null;
-    const p = { id:pid, name, g: g==='f'?'f':'m', bot:!!bot, skill:skill||0, conn:true, out:false, pts:0, team:0 };
-    if(this.ph!=='lobby'){ const n0=this.P.filter(x=>x.team===0).length, n1=this.P.filter(x=>x.team===1).length; p.team = n0<=n1 ? 0 : 1; }
+    const n=this.rows(), row = n[0]<=n[1] ? 0 : 1;   // new people go to the shorter row; they can move in the lobby
+    const p = { id:pid, name, g: g==='f'?'f':'m', bot:!!bot, skill:skill||0, conn:true, out:false, pts:0, row, team:row, triples:0 };
     this.P.push(p);
     return p;
   }
@@ -140,10 +162,16 @@ class Host {
     return b ? this.add('bot'+rid(5), b.name, b.g, true, b.skill) : null;
   }
   removeBot(){
-    for(let i=this.P.length-1;i>=0;i--) if(this.P[i].bot){ this.P.splice(i,1); return true; }
+    for(let i=this.P.length-1;i>=0;i--) if(this.P[i].bot){ this.P.splice(i,1); this.fixCheaters(); return true; }
     return false;
   }
-  remove(pid){ this.P = this.P.filter(p => p.id!==pid); if(this.prPid===pid) this.prPid=null; }
+  remove(pid){ this.P = this.P.filter(p => p.id!==pid); if(this.prPid===pid) this.prPid=null; this.fixCheaters(); }
+  /** Move a player to a row, if there is room in it. */
+  seat(p, row){
+    if(!p || (row!==0 && row!==1) || p.row===row) return;
+    if(p.id!==this.prPid && this.rows()[row]>=ROW_MAX) return;
+    p.row=row; this.fixCheaters();
+  }
   /** A player's phone connected or dropped. In a game they keep their seat and can come back. */
   setConn(pid, on){
     const p=this.p(pid); if(!p || p.bot || p.conn===on) return;
@@ -161,6 +189,7 @@ class Host {
       case 'addbot': if(lobby) this.addBot(); break;
       case 'rmbot': if(lobby) this.removeBot(); break;
       case 'teams': if(lobby) s.teams=!!d.v; break;
+      case 'move': if(lobby){ const t=this.p(d.id); if(t) this.seat(t, 1-t.row); } break;
       case 'pub': s.pub=!!d.v; break;
       case 'count': if(lobby && COUNTS.includes(d.v)) s.count=d.v; break;
       case 'packs': if(lobby && Array.isArray(d.v)){ const ok=Q.PACKS.map(p=>p.id).filter(id=>d.v.includes(id)); if(ok.length) s.packs=ok; } break;
@@ -171,11 +200,13 @@ class Host {
     }
   }
   start(){
-    if(this.ph!=='lobby' || this.P.length<this.minPlayers()) return false;
-    /* the proctor is whoever chose the chair in the lobby, for the whole game; everyone else is a student */
-    const pr=this.proctor(); let k=0;
-    this.P.forEach(p => { p.pts=0; p.out=false; p.team = p===pr ? -1 : (k++)%2; });
-    this.T=[0,0];
+    if(this.ph!=='lobby' || !this.canStart()) return false;
+    /* the proctor is whoever chose the chair in the lobby, for the whole game; everyone else is a student.
+       In a team game the rows are the ones people chose in the lobby. */
+    const pr=this.proctor(), teams=!!this.set.teams, n3=TRIPLES[this.set.count]||3; let k=0;
+    this.fixCheaters();
+    this.P.forEach(p => { p.pts=0; p.out=false; p.triples=n3; p.team = p===pr ? -1 : (teams ? p.row : (k++)%2); });
+    this.T=[0,0]; this.TA=[n3,n3];
     this.g = { teams:!!this.set.teams, qs:shuffle(this.pool()).slice(0,this.set.count), qi:0, prId: pr ? pr.id : null };
     this.ph='play'; this.last=Date.now();
     this.startQuestion();
@@ -187,8 +218,14 @@ class Host {
     const g=this.g, c=this.cfg;
     let q=g.qs[g.qi];
     if(q.t==='vote') q={ p:q.p, t:'vote', q:q.q, o:shuffle(this.P.map(p=>p.name)).slice(0,4), a:null, win:[] };
+    /* the four choices come up in a new order every time, unless they are numbers or the question pins them */
+    else if(q.t==='mc' && !q.fix && !q.o.every(x => /^[\d٠-٩\s\-–]+$/.test(x))){
+      const perm=shuffle(q.o.map((_,i)=>i));
+      q=Object.assign({}, q, { o:perm.map(i=>q.o[i]), a:perm.indexOf(q.a) });
+    }
     g.q=q;
-    g.qT=Math.round(c.qTime*QMULT[q.t]);
+    /* a long question gets a few more seconds to be read */
+    g.qT=Math.round(c.qTime*QMULT[q.t]) + (q.q.length>70 ? 5 : q.q.length>45 ? 3 : 0);
     const k=g.qT/15;
     g.phase='play'; g.elapsed=0; g.left=g.qT; g.hamR=0; g.hamL=0; g.fake=null; g.void=[false,false]; g.tres=null; g.tans=null;
     g.disp = q.t==='ord' ? shuffle([0,1,2,3]) : [0,1,2,3];
@@ -213,15 +250,17 @@ class Host {
       for(let i=0;i<f;i++) p.events.push({ t:rand(2,g.qT-1), type:'feint' });
       p.events.sort((a,b)=>a.t-b.t);
     }
-    /* each team's cheater changes every question, so everyone gets a go */
+    /* each team's cheater is the one the row chose in the lobby. If nobody was chosen (or he is away), it goes round. */
     if(g.teams) [0,1].forEach(t => {
       const m=members(g,t), here=m.filter(s=>!s.away), l=here.length?here:m;
-      if(l.length) l[g.qi % l.length].cheater=true;
+      const chosen=l.find(s => s.pl.id===this.ch[t]);
+      if(chosen) chosen.cheater=true; else if(l.length) l[g.qi % l.length].cheater=true;
     });
     g.students.forEach(s => {
       s.ans=null; s.base=0; s.near=false; s.exact=false; s.didCopy=false;
       s.caught=false; s.copiedFrom=null; s.copiedKey=null; s.peek=null; s.delta=0; s.bonus=0;
       s.mark=0; s.markRes=null; s.peeked=false; s.markDelta=0; s.seen={}; s.info=null;
+      s.bet=1; s.won=false;
       if(!s.human){
         s.conf = q.t==='vote' ? Math.random()<0.5 : Math.random()<s.skill;
         s.belief = (s.conf && q.t!=='vote') ? correctAns(q) : guessAns(q);
@@ -229,6 +268,9 @@ class Host {
         s.verify = s.conf && Math.random()<0.3;
         s.nextPeekAt = s.conf ? (s.verify ? rand(3,11)*k : Infinity) : rand(1.2,8)*k;
         s.caution = rand(0.4,1.4);
+        /* a computer player raises the wager when it thinks it knows */
+        const r=Math.random();
+        s.ownBet = (q.t==='vote' || !s.conf) ? 1 : (r<0.1 ? 3 : (r<0.5 ? 2 : 1));
         s.decoyer = !g.teams && s.conf && Math.random()<0.4; s.decoying=false; s.decoyUsed=false;
         s.releaseAt=null; s.done=false;
         s.recheck = !s.conf && Math.random()<0.5; s.rechecked=false;
@@ -247,6 +289,21 @@ class Host {
       if(this.ph!=='lobby') return;
       if(d.v==='pr'){ if(!this.proctor()) this.prPid=pid; }
       else if(this.prPid===pid) this.prPid=null;
+      this.fixCheaters();
+      return;
+    }
+    if(d.k==='row'){
+      /* in the lobby everyone picks the row they sit in */
+      if(this.ph==='lobby') this.seat(pl, d.v);
+      return;
+    }
+    if(d.k==='cheat'){
+      /* a row picks its cheater: any member can name one of the row (the owner can do it for any row). Naming him again takes it back. */
+      if(this.ph!=='lobby') return;
+      const t=this.p(d.id);
+      if(!t || t.id===this.prPid) return;
+      if(pid!==this.me && (pl.row!==t.row || pid===this.prPid)) return;
+      this.ch[t.row] = this.ch[t.row]===t.id ? null : t.id;
       return;
     }
     if(d.k==='out'){
@@ -269,6 +326,12 @@ class Host {
     const dead = g.teams ? g.void[s.team] : s.caught;
     if(d.k==='peek'){ s.in.peek = (d.v===1||d.v===-1) ? d.v : 0; return; }
     if(dead) return;
+    if(d.k==='bet'){
+      const v=d.v;
+      if(v!==1 && v!==2 && v!==3) return;
+      if(v===3 && (g.teams ? this.TA[s.team] : pl.triples)<=0) return;
+      s.bet=v; return;
+    }
     if(d.k==='ans') s.ans=cleanAns(g.q, d.v);
     else if(d.k==='adopt' && g.teams){ const ty=tally(g,s.team); if(ty.lead!==null) s.ans=clone(ty.leadAns); }
   }
@@ -370,6 +433,11 @@ class Host {
     p.in.turn=false; p.in.back=false;
   }
 
+  /** The wager a computer player puts on its own answer. */
+  botBet(s){
+    const left = this.g.teams ? this.TA[s.team] : s.pl.triples;
+    return (s.ownBet===3 && left<=0) ? 2 : s.ownBet;
+  }
   /** Individual play: everyone has a paper and can look at the neighbour on each side. */
   stepSolo(dt){
     const g=this.g, p=g.pr, c=this.cfg, N=g.students.length, q=g.q;
@@ -390,9 +458,10 @@ class Host {
         return;
       }
       const watched=g.students.some(o => o!==s && o.peek && o.peek.target===s.idx && o.peek.prog>0.3*c.peekTime);
-      if(watched && s.decoyer && !s.decoyUsed && g.left>2.5){ s.decoyUsed=true; s.decoying=true; s.ans=decoyAns(q,s.belief); }
-      if(s.decoying && g.left<=1.2){ s.decoying=false; s.ans=clone(s.belief); }
-      if(s.ans===null && g.elapsed>=s.answerAt) s.ans=clone(s.belief);
+      /* a decoy comes with a raised wager, to look sure of it; the real one goes back at the last second */
+      if(watched && s.decoyer && !s.decoyUsed && g.left>2.5){ s.decoyUsed=true; s.decoying=true; s.ans=decoyAns(q,s.belief); s.bet=2; }
+      if(s.decoying && g.left<=1.2){ s.decoying=false; s.ans=clone(s.belief); s.bet=this.botBet(s); }
+      if(s.ans===null && g.elapsed>=s.answerAt){ s.ans=clone(s.belief); s.bet=this.botBet(s); }
       if(s.peek){
         if(s.releaseAt!=null && g.elapsed>=s.releaseAt){
           s.peek=null; s.releaseAt=null; s.nextPeekAt=g.elapsed+rand(0.3,1.2); s.caution=rand(0.4,1.4); return;
@@ -404,7 +473,11 @@ class Host {
           if(!s.peek.seen && tk!==null){
             /* the paper is readable: copy, then linger a moment like a person reading it */
             s.peek.seen=true; s.peek.until=s.peek.prog+rand(0.2,0.6);
-            if(!s.conf || (tk!==keyOf(q,s.belief) && Math.random()<0.4)){ s.ans=clone(tg.ans); s.copiedFrom=tg.idx; s.copiedKey=tk; }
+            if(!s.conf || (tk!==keyOf(q,s.belief) && Math.random()<0.4)){
+              s.ans=clone(tg.ans); s.copiedFrom=tg.idx; s.copiedKey=tk;
+              /* copying from someone who looks sure is worth a double, sometimes */
+              s.bet = (q.t!=='vote' && tg.bet>1 && Math.random()<0.45) ? 2 : 1;
+            }
           }
           if(s.peek.seen){
             if(s.peek.prog>=s.peek.until){
@@ -445,6 +518,9 @@ class Host {
         return;
       }
       if(s.ans===null && g.elapsed>=s.answerAt) s.ans=clone(s.belief);
+      /* the wager: computer players go with the people in their row; a row with no people follows its first member */
+      const folk=members(g,s.team).filter(x => x.human && !x.away), first=members(g,s.team).find(x => !x.human);
+      s.bet = folk.length ? Math.max.apply(null, folk.map(x => x.bet)) : (first===s ? this.botBet(s) : first.bet);
       /* every second or two, look at the team's sheet and maybe move to what the others wrote */
       if(s.ans!==null && !s.peek && s.info===null && g.elapsed>=s.nextFollow){
         s.nextFollow=g.elapsed+rand(0.8,1.8);
@@ -504,7 +580,8 @@ class Host {
       g.tans=[0,1].map(t => g.void[t] ? null : tally(g,t).leadAns);
       const T=g.tres=[0,1].map(t => {
         const ty=tally(g,t);
-        return { ans:g.tans[t], all:!g.void[t]&&ty.all, dead:g.void[t], voted:ty.n, bonus:0, mark:0, copied:false, peeked:false, delta:0, base:0, near:false, exact:false };
+        return { ans:g.tans[t], all:!g.void[t]&&ty.all, dead:g.void[t], voted:ty.n, bonus:0, mark:0, copied:false, peeked:false, delta:0, base:0, near:false, exact:false,
+                 bet: (g.void[t] || g.tans[t]===null) ? 1 : teamBet(g,t), won:false };
       });
       const live=T.filter(r=>!r.dead);
       if(q.t==='num') scoreNums(q, live);
@@ -519,7 +596,13 @@ class Host {
         }
       });
       g.students.forEach(s => { T[s.team].mark += judge(s); });
-      [0,1].forEach(t => { T[t].delta = T[t].dead ? -5 : (T[t].base+T[t].bonus+T[t].mark); this.T[t]+=T[t].delta; });
+      [0,1].forEach(t => {
+        const r=T[t];
+        if(r.bet===3 && this.TA[t]<=0) r.bet=2;
+        r.won = !r.dead && r.base>=10;
+        if(!r.dead && r.bet===3) this.TA[t]--;
+        r.delta = r.dead ? -5 : (stakePts(r.base,r.bet)+r.bonus+r.mark); this.T[t]+=r.delta;
+      });
     } else {
       const live=g.students.filter(s=>!s.caught);
       if(q.t==='num') scoreNums(q, live);
@@ -530,7 +613,13 @@ class Host {
         if(c.didCopy && c.base<10){ const v=g.students[c.copiedFrom]; if(!v.caught && v.base>=10) v.bonus+=5; }
       });
       g.students.forEach(s => { s.markDelta=judge(s); });
-      g.students.forEach(s => { s.delta = s.caught ? -5 : (s.base+s.bonus+s.markDelta); s.pl.pts+=s.delta; });
+      g.students.forEach(s => {
+        if(s.caught || s.ans===null) s.bet=1;
+        if(s.bet===3 && s.pl.triples<=0) s.bet=2;
+        s.won = !s.caught && s.base>=10;
+        if(s.bet===3) s.pl.triples--;
+        s.delta = s.caught ? -5 : (stakePts(s.base,s.bet)+s.bonus+s.markDelta); s.pl.pts+=s.delta;
+      });
     }
     p.delta = Math.floor(p.writePts) + this.cfg.catchPts*p.catches.length + p.markPts;
     if(p.pl) p.pl.pts+=p.delta;
@@ -542,8 +631,9 @@ class Host {
   view(pid){
     const V = { code:this.code, ph:this.ph, owner:this.me, me:pid, set:this.set, cfg:this.cfg, pr:this.proctor() ? this.prPid : null,
       min:this.minPlayers(), max:MAXP, qn:Math.min(this.set.count, this.pool().length),
-      P:this.P.map(p => ({ id:p.id, n:p.name, g:p.g, bot:p.bot?1:0, on:p.conn?1:0, out:p.out?1:0, pts:p.pts, team:p.team })),
-      T:this.T, ev:this.ev };
+      ok:this.canStart()?1:0, rows:this.rows(), rowMin:ROW_MIN, rowMax:ROW_MAX, ch:this.ch, triples:TRIPLES[this.set.count]||3,
+      P:this.P.map(p => ({ id:p.id, n:p.name, g:p.g, bot:p.bot?1:0, on:p.conn?1:0, out:p.out?1:0, pts:p.pts, team:p.team, row:p.row, triples:p.triples })),
+      T:this.T, TA:this.TA, ev:this.ev };
     if(this.g && this.ph!=='lobby') V.g=this.gview(pid);
     return V;
   }
@@ -568,7 +658,7 @@ class Host {
     o.S = g.students.map((s,i) => {
       const x = { n:s.name, g:s.g, id:s.pl.id, team:s.team, caught:s.caught?1:0, away:s.away?1:0 };
       if(reveal){
-        Object.assign(x, { ans:s.ans, base:s.base, near:s.near?1:0, exact:s.exact?1:0, bonus:s.bonus, delta:s.delta, didCopy:s.didCopy?1:0,
+        Object.assign(x, { ans:s.ans, bet:s.bet, won:s.won?1:0, base:s.base, near:s.near?1:0, exact:s.exact?1:0, bonus:s.bonus, delta:s.delta, didCopy:s.didCopy?1:0,
           copiedFrom:s.copiedFrom, peeked:s.peeked?1:0, mark:s.mark, markRes:s.markRes, cheater:s.cheater?1:0 });
         return x;
       }
@@ -577,7 +667,7 @@ class Host {
       const mine = i===mi, mate = !!g.teams && s.team===me.team;
       let show = mine || mate;
       if(!show && me.peek) show = g.teams ? (s.team!==me.team && !g.void[s.team]) : me.peek.target===i;
-      if(show) x.ans=s.ans;
+      if(show){ x.ans=s.ans; x.bet=s.bet; }
       if(mine){ x.mark=s.mark; x.peek = s.peek ? { target:s.peek.target, prog:+s.peek.prog.toFixed(2) } : null; x.seen=s.seen; }
       if(mate){ x.cheater=s.cheater?1:0; if(s.cheater){ x.peeking=s.peek?1:0; x.saw=s.info!==null?1:0; } }
       return x;
@@ -592,7 +682,7 @@ class Host {
   }
 }
 
-const LagnaEngine = { Host, MAXP, COUNTS, CFG, CFG_RANGE, TEACHER, rid, isPick, keyOf, correctAns, posRight, tally, members, cheaterOf };
+const LagnaEngine = { Host, MAXP, COUNTS, CFG, CFG_RANGE, TEACHER, LOSE, TRIPLES, rid, isPick, keyOf, correctAns, posRight, tally, members, cheaterOf, teamBet, stakePts };
 if(typeof globalThis !== 'undefined') globalThis.LagnaEngine = LagnaEngine;
 if(typeof module !== 'undefined' && module.exports) module.exports = LagnaEngine;
 })();

@@ -14,7 +14,8 @@ const AR = '٠١٢٣٤٥٦٧٨٩';
 const LETTERS = ['أ','ب','ج','د'];
 const TEAM = ['صف اليمين','صف الشمال'];
 const KIND = { mc:'اختار إجابة', tf:'الجملة دي صح ولا غلط؟', ord:'دوس عليهم بالترتيب', num:'اكتب رقم، والأقرب يكسب', vote:'مفيش إجابة صح. اللي يختار مع الأغلبية يكسب' };
-const KIND_PACK = { trap:'ركّز، السؤال فيه فخ', odd:'تلاتة بينهم حاجة مشتركة. طلّع الرابع' };
+const KIND_PACK = { trap:'ركّز، السؤال فيه فخ', fzr:'فزورة: إيه هو؟' };
+const BET = ['','عادي','دوبل','تربل'];
 const ar = v => String(v).replace(/\d/g, d => AR[+d]).replace('.', '٫');
 const latin = t => String(t).replace(/[٠-٩]/g, d => AR.indexOf(d));
 const num = n => (n<0?'−':'') + ar(Math.abs(n));
@@ -62,27 +63,34 @@ const SAY = {
   prGood:{m:'زوّد ',f:'زوّدت ',u:'زوّدت '},
   prFooled:{m:'اتخدع في ',f:'اتخدعت في ',u:'اتخدعت في '},
   /* the same four, said to the player they are about */
+  betting:{m:' ومراهن ',f:' ومراهنة ',u:''},
+  betWon:{m:'راهن %s وكسب',f:'راهنت %s وكسبت',u:'راهنت %s وكسبت'},
+  betLost:{m:'راهن %s وخسر',f:'راهنت %s وخسرت',u:'راهنت %s وخسرت'},
   prRightU:{m:'شك صح فيك',f:'شكّت صح فيك'}, prWrongU:{m:'ظلمك',f:'ظلمتك'}, prGoodU:{m:'زوّدك',f:'زوّدتك'}, prFooledU:{m:'اتخدع فيك',f:'اتخدعت فيك'}
 };
 const HOW = {
   solo:[
     'كل واحد من موبايله. قبل ما تبدأوا، اللي عايز يبقى المراقب يختار "مراقب" والباقي طلبة. لو محدش اختار، الكمبيوتر هو المراقب.',
     'الطالب يجاوب في ورقته قبل ما الوقت يخلص. كل سؤال ليه طريقة: اختيار، صح ولا غلط، ترتيب، أو رقم.',
+    'واثق من إجابتك؟ راهن عليها. "دوبل": صح تاخد ٢٠، غلط تخسر ١٠. "تربل": صح تاخد ٣٠، غلط تخسر ٣٠، وليك منها عدد محدود في اللعبة.',
     'مش عارف؟ دوس على "بص" وافضل دايس. ورقة جارك بتبدأ مش واضحة وبتوضح وإنت دايس، ولو سبت ورجعت بتكمّل من مكان ما وقفت.',
     'السبورة اللي فوق خضرا يعني أمان. لو احمرّت سيب الزرار فوراً. لو المراقب لفّ وإنت دايس، سؤالك يتلغى وتنقص ٥.',
     'المراقب ضهره للجنة، وبيسمع الهمهمة جاية من يمينه ولا شماله. يدوس "لفّ" واللي بيبص ساعتها يتمسك. رصيد البص محدود.',
     'المراقب يقدر يكتب أسامي على السبورة: في المشاغبين لو شاكك، وفي الممتازين لو متأكد. حكمه صح يكسب، غلط يخسر.'
   ],
   teams:[
-    'اللجنة صفّين: صف اليمين وصف الشمال. المراقب واحد منكم لو اختار "مراقب"، وإلا يبقى الكمبيوتر.',
+    'اللجنة صفّين: صف اليمين وصف الشمال. قبل ما تبدأوا كل واحد يختار صفّه، وكل صف يختار الغشاش بتاعه.',
+    'المراقب واحد منكم لو اختار "مراقب"، وإلا يبقى الكمبيوتر.',
     'كل صف ليه إجابة واحدة. كل واحد يحط الإجابة اللي شاكك فيها، وبتشوفوا الصف رايح على إيه.',
     'لو الصف كله على نفس الإجابة تبقى إجابتكم. لو ما اتفقتوش، الأغلبية آخر الوقت هي اللي تتحسب.',
-    'في كل سؤال واحد بس من الصف هو الغشاش، والدور بيلفّ: يدوس ويفضل دايس عشان يشوف الصف التاني كاتبين إيه.',
+    'الغشاش بس هو اللي يقدر يبص: يدوس ويفضل دايس عشان يشوف الصف التاني كاتبين إيه. لو ما اخترتوش غشاش، الدور بيلفّ عليكم كل سؤال.',
+    'الرهان (دوبل أو تربل) بيتحسب لو كل اللي جاوبوا في الصف رفعوه. واحد بس سابه "عادي" يبقى عادي.',
     'لو المراقب لفّ والغشاش دايس، سؤال الصف كله يتلغى وتنقصوا ٥.'
   ]
 };
 const ICON = {
   paper:'<svg width="42" height="42" viewBox="0 0 44 44" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="5" width="26" height="34" rx="4"></rect><path d="M15 15 h14"></path><path d="M15 22 h14"></path><path d="M15 29 h8"></path></svg>',
+  eyeS:'<svg width="22" height="16" viewBox="0 0 64 44" fill="none" aria-hidden="true"><path d="M3 22 Q32 -6 61 22 Q32 50 3 22 Z" fill="#FFFFFF" stroke="currentColor" stroke-width="5"></path><circle cx="32" cy="22" r="10" fill="currentColor"></circle></svg>',
   eye:'<svg width="50" height="42" viewBox="0 0 64 44" fill="none" aria-hidden="true"><path d="M3 22 Q32 -6 61 22 Q32 50 3 22 Z" fill="#FFFFFF" stroke="currentColor" stroke-width="4"></path><circle cx="22" cy="22" r="10" fill="currentColor"></circle></svg>'
 };
 
@@ -356,7 +364,7 @@ function buildG(){
   const S=v.S.map((s,i) => {
     const mine=i===mi;
     return { idx:i, name:mine?'إنت':s.n, real:s.n, g:mine?'u':(s.g==='f'?'f':'m'), user:mine, id:s.id, team:s.team, caught:!!s.caught, away:!!s.away,
-      ans: s.ans===undefined ? null : s.ans, mark:s.mark||0, peek:s.peek||null, seen:s.seen||{}, cheater:!!s.cheater, peeking:!!s.peeking, saw:!!s.saw,
+      ans: s.ans===undefined ? null : s.ans, bet:s.bet||1, won:!!s.won, mark:s.mark||0, peek:s.peek||null, seen:s.seen||{}, cheater:!!s.cheater, peeking:!!s.peeking, saw:!!s.saw,
       base:s.base||0, near:!!s.near, exact:!!s.exact, bonus:s.bonus||0, delta:s.delta||0, didCopy:!!s.didCopy, copiedFrom:s.copiedFrom, peeked:!!s.peeked, markRes:s.markRes||null };
   });
   G = { mode:v.role, teams:!!v.teams, phase:v.phase, qi:v.qi, qs:{length:v.qn}, qT:v.qT, left:v.left, rc:v.rc, me:mi, q:v.q, disp:v.disp, void:v.void,
@@ -367,6 +375,8 @@ function buildG(){
   /* what I just tapped shows at once, without waiting for the server to say it back */
   const p=U.pend;
   if(p && mi>=0 && p.qi===v.qi && Date.now()-p.at<600) S[mi].ans=p.ans; else U.pend=null;
+  const pb=U.pendB;
+  if(pb && mi>=0 && pb.qi===v.qi && Date.now()-pb.at<600) S[mi].bet=pb.bet; else U.pendB=null;
 }
 function route(){
   if(!V) return;
@@ -389,6 +399,8 @@ function route(){
 /* small wrappers so the drawing code reads like the rules */
 const keyOf = a => E.keyOf(G.q, a);
 const tally = t => E.tally(G, t);
+const teamBet = t => E.teamBet(G, t);
+function betWord(e, g){ return e.bet>1 ? SAY[e.won?'betWon':'betLost'][g].replace('%s', BET[e.bet]) : ''; }
 const isPick = q => E.isPick(q);
 function ansText(a){
   const q=G.q;
@@ -423,6 +435,10 @@ function renderRoom(){
       ros.appendChild(el);
     });
   }
+  /* in a team game the lobby shows the two rows instead of one list: pick your row, and each row picks its cheater */
+  const rowsOn = lobby && s.teams;
+  setHidden($('room-roster'), rowsOn); setHidden($('room-rows'), !rowsOn); setHidden($('rows-hint'), !rowsOn);
+  if(rowsOn) renderRows(me, owner);
   setHidden($('room-stepper'), !owner || !lobby);
   $('room-less').disabled=!V.P.some(p => p.bot);
   $('room-more').disabled=n>=V.max;
@@ -432,7 +448,7 @@ function renderRoom(){
   $('room-solo').classList.toggle('on', !s.teams); $('room-solo').setAttribute('aria-pressed', s.teams?'false':'true');
   $('room-teams').classList.toggle('on', s.teams); $('room-teams').setAttribute('aria-pressed', s.teams?'true':'false');
   $('room-solo').disabled=$('room-teams').disabled=!owner || !lobby;
-  $('room-modehint').textContent = s.teams ? 'صفّين ضد بعض: كل صف ليه إجابة واحدة، وفي كل سؤال غشاش واحد.' : 'كل واحد بيجاوب لنفسه ويبص على اللي جنبه.';
+  $('room-modehint').textContent = s.teams ? 'صفّين ضد بعض: كل صف ليه إجابة واحدة وغشاش واحد.' : 'كل واحد بيجاوب لنفسه ويبص على اللي جنبه.';
   /* my role: a student, or the proctor if the chair is free */
   const prP=V.P.find(p => p.id===V.pr) || null, iAmPr=V.pr===pid;
   $('role-st').classList.toggle('on', !iAmPr); $('role-st').setAttribute('aria-pressed', iAmPr?'false':'true');
@@ -452,15 +468,54 @@ function renderRoom(){
     $('room-hint').textContent='';
     return;
   }
-  const need=V.min-n, ready=need<=0, ow=V.P.find(p => p.id===V.owner);
+  const need=V.min-n, ready=!!V.ok, ow=V.P.find(p => p.id===V.owner);
   setHidden($('btn-start'), !owner);
   $('btn-start').disabled=!ready;
-  $('btn-start-s').textContent = ready ? ar(n)+' لعيبة، '+ar(V.qn)+(V.qn<=10?' أسئلة':' سؤال') : 'لسه العدد ناقص';
-  $('room-hint').textContent = !ready ? 'محتاجين '+(need===1?'لاعب واحد':need===2?'لاعبين':ar(need)+' لعيبة')+' كمان عشان تبدأوا. أقل عدد '+(s.teams?'في الفرق ':'')+ar(V.min)+'.'
+  $('btn-start-s').textContent = ready ? ar(n)+' لعيبة، '+ar(V.qn)+(V.qn<=10?' أسئلة':' سؤال') : need>0 ? 'لسه العدد ناقص' : 'الصفوف مش مظبوطة';
+  $('room-hint').textContent = need>0 ? 'محتاجين '+(need===1?'لاعب واحد':need===2?'لاعبين':ar(need)+' لعيبة')+' كمان عشان تبدأوا. أقل عدد '+(s.teams?'في الفرق ':'')+ar(V.min)+'.'
+    : !ready ? 'كل صف لازم يبقى فيه '+(V.rowMin===2?'اتنين':ar(V.rowMin))+' على الأقل. انقلوا حد للصف الناقص.'
     : owner ? 'كله جاهز. لما الكل يدخل، ابدأ.' : 'مستنيين '+(ow?ow.n:'صاحب اللجنة')+SAY.starts[ow && ow.g==='f'?'f':'m']+'.';
   /* the owner's numbers */
   if(owner) TUNE.forEach(t => { const el=$(t[0]); if(document.activeElement!==el){ el.value=V.cfg[t[1]]; $(t[0]+'-out').textContent=ar(el.value); } });
 }
+function renderRows(me, owner){
+  const iAmPr=V.pr===pid, myRow = (me && !iAmPr) ? me.row : -1;
+  const key=JSON.stringify([V.P.map(p => [p.id,p.n,p.on,p.bot,p.out,p.row]), V.owner, V.pr, V.ch, pid]);
+  if(U.rowsKey!==key){
+    U.rowsKey=key;
+    [0,1].forEach(r => {
+      const list=$('row-l'+r); list.textContent='';
+      const mem=V.P.filter(p => p.row===r && p.id!==V.pr);
+      mem.forEach(p => {
+        const d=document.createElement('div'), can = owner || (myRow===r);
+        d.className='mem'+(p.id===pid?' me':'')+(p.bot?' bot':'')+((!p.on||p.out)?' off':'')+(V.ch[r]===p.id?' ch':'');
+        d.innerHTML='<button type="button" class="memb" data-id=""><span></span><i>'+ICON.eyeS+'</i></button>'+(owner?'<button type="button" class="mv" data-id="">انقل</button>':'');
+        const b=d.querySelector('.memb'); b.setAttribute('data-id', p.id); b.disabled=!can;
+        b.setAttribute('aria-pressed', V.ch[r]===p.id?'true':'false');
+        b.querySelector('span').textContent = p.id===pid ? 'إنت' : p.n;
+        const mv=d.querySelector('.mv'); if(mv){ mv.setAttribute('data-id', p.id); mv.setAttribute('aria-label', 'انقل '+p.n+' للصف التاني'); mv.disabled=V.rows[1-r]>=V.rowMax; }
+        list.appendChild(d);
+      });
+      if(!mem.length){ const e=document.createElement('div'); e.className='rowempty'; e.textContent='لسه فاضي'; list.appendChild(e); }
+      const chP=V.P.find(p => p.id===V.ch[r]);
+      $('row-c'+r).textContent = chP ? 'الغشاش: '+chP.n : 'الغشاش: بالدور كل سؤال';
+      $('row-n'+r).textContent = ar(mem.length);
+      $('row-b'+r).classList.toggle('myrow', myRow===r);
+      const sit=$('row-sit'+r);
+      setHidden(sit, iAmPr || myRow===r);
+      sit.disabled = V.rows[r]>=V.rowMax;
+    });
+  }
+  $('rows-hint').textContent = owner ? 'دوس على اسم عشان يبقى غشاش صفّه، و"انقل" بتودّيه الصف التاني.'
+    : iAmPr ? 'إنت المراقب، مش في صف.' : 'دوس على اسم من صفّك عشان يبقى الغشاش بتاعكم.';
+}
+$('room-rows').addEventListener('click', e => {
+  if(!V || V.ph!=='lobby' || !e.target.closest) return;
+  const mv=e.target.closest('.mv'), mb=e.target.closest('.memb'), sit=e.target.closest('.sit');
+  if(mv && !mv.disabled) cmd('move', {id:mv.getAttribute('data-id')});
+  else if(mb && !mb.disabled) act({k:'cheat', id:mb.getAttribute('data-id')});
+  else if(sit && !sit.disabled) act({k:'row', v:+sit.getAttribute('data-r')});
+});
 $('room-less').addEventListener('click', () => cmd('rmbot'));
 $('room-more').addEventListener('click', () => cmd('addbot'));
 $('room-solo').addEventListener('click', () => cmd('teams', {v:false}));
@@ -505,7 +560,7 @@ function paintQuestion(){
     const u=G.students[G.me], T=G.teams, choice=q.t!=='num';
     $('st-qcount').textContent=count;
     $('st-pack').textContent=PACK_NAME[q.p];
-    $('st-kind').textContent=KIND_PACK[q.p] || KIND[q.t];
+    $('st-kind').textContent = q.t==='mc' ? (KIND_PACK[q.p] || KIND.mc) : KIND[q.t];
     [$('st-q'),$('st-peek-q')].forEach(el => { el.textContent=q.q; el.classList.toggle('small', q.q.length>34); });
     const btns=$('st-opts').children, cells=$('st-peek-opts').children;
     const maxLen = choice ? Math.max.apply(null, q.o.map(t => t.length)) : 0;
@@ -610,7 +665,7 @@ function renderStudent(){
       setText($('st-peek-status'), gone ? 'غشاشهم اتمسك وورقتهم اتسحبت' : !clear ? 'لسه مش واضحة' : !has ? 'لسه ما كتبوش' : 'وضحت خالص');
       if(isPick(q)) for(let j=0;j<4;j++) setText(cells[j].querySelector('.vt'), (!gone && oty.c[j]) ? ar(oty.c[j]) : '');
       if(gone) hint='ورقتهم اتسحبت، مفيش حاجة تتنقل.';
-      else if(clear && shown!==null) hint=(oty.all?'كلهم على ':'أغلبهم على ')+(q.t==='ord' || ansText(shown).length>18 ? 'الإجابة دي' : ansText(shown))+'. صح، ولا بيضحكوا عليكم؟';
+      else if(clear && shown!==null){ const ob=teamBet(other); hint=(oty.all?'كلهم على ':'أغلبهم على ')+(q.t==='ord' || ansText(shown).length>18 ? 'الإجابة دي' : ansText(shown))+(ob>1?' ومراهنين '+BET[ob]:'')+'. صح، ولا بيضحكوا عليكم؟'; }
       else if(clear && has) hint='لسه مختلفين مع بعض. استنى شوية.';
       else if(clear) hint='لسه ما كتبوش حاجة. استنى شوية.';
       else hint='لو سبت الزرار ورجعت، بتكمّل من نفس الوضوح.';
@@ -620,7 +675,7 @@ function renderStudent(){
       setText($('st-peek-name'), 'ورقة '+tg.name);
       setText($('st-peek-status'), gone ? (tg.away ? SAY.left[tg.g] : SAY.paperGone[tg.g]) : !clear ? 'لسه مش واضحة' : !has ? SAY.notYet[tg.g] : 'وضحت خالص');
       if(gone) hint='الورقة اتسحبت. بص على حد تاني.';
-      else if(clear && has) hint=(isPick(q) && ansText(tg.ans).length<=18 ? tg.name+SAY.chose[tg.g]+ansText(tg.ans) : 'دي إجابة '+tg.name)+'. صح، ولا '+(tg.g==='f'?'بتضحك':'بيضحك')+' عليك؟';
+      else if(clear && has) hint=(isPick(q) && ansText(tg.ans).length<=18 ? tg.name+SAY.chose[tg.g]+ansText(tg.ans) : 'دي إجابة '+tg.name)+(tg.bet>1?SAY.betting[tg.g]+BET[tg.bet]:'')+'. صح، ولا '+(tg.g==='f'?'بتضحك':'بيضحك')+' عليك؟';
       else if(clear) hint='لسه مفيش إجابة في الورقة. استنى شوية أو بص على غيره.';
       else hint='لو سبت الزرار ورجعت، بتكمّل من نفس الوضوح.';
     }
@@ -640,9 +695,19 @@ function renderStudent(){
       setText($('st-num-val'), u.ans===null ? '؟' : ar(u.ans));
       Array.prototype.forEach.call($('st-keys').children, b => { if(b.disabled!==dead) b.disabled=dead; });
     }
+    /* the wager */
+    const left3 = T ? V.TA[u.team] : ((meP()||{}).triples||0), bb=$('st-bets').children;
+    for(let i=0;i<3;i++){
+      const on = !dead && u.bet===i+1, dis = dead || (i===2 && left3<=0 && u.bet!==3);
+      bb[i].classList.toggle('on', on); bb[i].setAttribute('aria-pressed', on?'true':'false');
+      if(bb[i].disabled!==dis) bb[i].disabled=dis;
+    }
+    setText($('st-bet3'), 'تربل ('+ar(Math.max(0,left3))+')');
     if(T){
       const same = q.t==='ord' ? 'نفس الترتيب' : ty.lead===null ? '' : ansText(ty.leadAns);
-      setText($('st-tl-t'), dead ? '' : ty.n===0 ? 'محدش في الصف جاوب لسه' : ty.all ? 'الصف كله على '+same : ty.lead!==null ? ar(ty.max)+' من '+ar(ty.size)+' على '+same : 'الإجابات متقسمة، اتفقوا');
+      /* the row's wager counts only when everyone who answered raised it */
+      const tb=teamBet(u.team), betTxt = ty.n===0 ? '' : tb>1 ? ' · رهانكم '+BET[tb] : u.bet>1 ? ' · الرهان لسه عادي' : '';
+      setText($('st-tl-t'), dead ? '' : (ty.n===0 ? 'محدش في الصف جاوب لسه' : ty.all ? 'الصف كله على '+same : ty.lead!==null ? ar(ty.max)+' من '+ar(ty.size)+' على '+same : 'الإجابات متقسمة، اتفقوا')+betTxt);
       setHidden($('st-adopt'), dead || isPick(q) || ty.lead===null || myKey===ty.lead);
     }
     $('st-paper').classList.toggle('caught', dead);
@@ -786,6 +851,7 @@ function renderReveal(){
       else{
         if(keyOf(r.ans)===null) parts.push(r.voted ? (mine?'ما اتفقتوش على إجابة':'ما اتفقوش على إجابة') : (mine?'ما جاوبتوش':'ما جاوبوش'));
         else parts.push(resultWord(r,'m').replace(/^كتب /, mine?'كتبتوا ':'كتبوا ').replace(/^اختار /, mine?'اخترتوا ':'اختاروا ')+(r.all?'، بالإجماع':'، بالأغلبية'));
+        if(r.bet>1) parts.push((mine?'راهنتوا ':'راهنوا ')+BET[r.bet]+(r.won ? (mine?' وكسبتوا':' وكسبوا') : (mine?' وخسرتوا':' وخسروا')));
         if(r.copied) parts.push(mine?'نقلتوا من الصف التاني':'نقلوا من الصف التاني');
         else if(r.peeked) parts.push(mine?'غشاشكم بص وما نقلتوش':'غشاشهم بص وما نقلوش');
         if(r.bonus>0) parts.push(mine?'ضحكتوا على الصف التاني':'ضحكوا على الصف التاني');
@@ -800,6 +866,7 @@ function renderReveal(){
       else if(s.away && keyOf(s.ans)===null) t.push(SAY.out[s.g]);
       else{
         t.push(resultWord(s, s.g));
+        if(s.bet>1) t.push(betWord(s, s.g));
         if(s.didCopy && G.students[s.copiedFrom]) t.push(SAY.copied[s.g]+G.students[s.copiedFrom].name);
         else if(s.peeked) t.push(SAY.peeked[s.g]);
         if(s.bonus>0) t.push(SAY.fooled[s.g]);
@@ -940,6 +1007,12 @@ function numKey(d){
 }
 Array.prototype.forEach.call($('st-opts').children, (b,i) => b.addEventListener('click', () => boxTap(i)));
 $('st-keys').addEventListener('click', e => { const b=e.target.closest ? e.target.closest('[data-d]') : null; if(b) numKey(b.getAttribute('data-d')); });
+$('st-bets').addEventListener('click', e => {
+  const b=e.target.closest ? e.target.closest('.bet') : null, u=player();
+  if(!b || b.disabled || !u) return;
+  u.bet=+b.getAttribute('data-b'); U.pendB={ qi:G.qi, bet:u.bet, at:Date.now() };
+  act({k:'bet', v:u.bet}); renderStudent();
+});
 $('st-adopt').addEventListener('click', () => { if(player() && G.teams){ U.pend=null; act({k:'adopt'}); } });
 
 /* desktop keys: arrows peek, digits answer; proctor: space turns / goes back */
